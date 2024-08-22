@@ -4,7 +4,8 @@ import { genSaltSync, hashSync } from 'bcrypt';
 import { StreamChat } from "stream-chat";
 
 dotenv.config();
-const { PORT, STREAM_API_KEY, STREAM_API_SECRET } = process.env;
+const PORT = process.env.PORT || 3000;
+const { STREAM_API_KEY, STREAM_API_SECRET } = process.env;
 const client = StreamChat.getInstance(STREAM_API_KEY!, STREAM_API_SECRET);
 
 const app = express();
@@ -24,53 +25,30 @@ app.post('/register', async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-        return res.status(400).json({
-            message: 'Email and password are required.',
-        });
+        return res.status(400).json({ message: 'Email and password are required.' });
     }
 
     if (password.length < 6) {
-        return res.status(400).json({
-            message: 'Password must be at least 6 characters.'
-        });
+        return res.status(400).json({ message: 'Password must be at least 6 characters.' });
     }
 
     const existingUser = USERS.find((user) => user.email === email);
     if (existingUser) {
-        return res.status(400).json({
-            message: 'User already exists.',
-        });
+        return res.status(400).json({ message: 'User already exists.' });
     }
 
     try {
         const hashed_password = hashSync(password, salt);
-        const id = Math.random().toString(36).slice(2); 
-        
-        const newUser: User = {
-            id,
-            email,
-            hashed_password,
-        };
+        const id = Math.random().toString(36).slice(2);
+
+        const newUser: User = { id, email, hashed_password };
         USERS.push(newUser);
 
-        await client.upsertUser({
-            id,
-            email,
-            name: email,
-        });
+        await client.upsertUser({ id, email, name: email });
 
         const token = client.createToken(id);
 
-        return res.status(200).json({
-            token,
-            user: {
-                id,
-                email,
-            }
-        });
-
-        // Note: This line is unreachable due to the return statement above
-        // res.status(201).json({ message: 'User registered successfully.' });
+        return res.status(200).json({ token, user: { id, email } });
 
     } catch (err) {
         res.status(500).json({ error: 'Internal server error.' });
@@ -78,26 +56,16 @@ app.post('/register', async (req, res) => {
 });
 
 app.post('/login', (req, res) => {
-    const {email, password} = req.body;
- const user = USERS.find((user) => user.email === email);
- const hashed_password = hashSync(password, salt)
- 
-if(!user || user.hashed_password !== hashed_password){
-    return res.status(400).json({
-        message: 'Invalid credentials.',
-    });
-}
+    const { email, password } = req.body;
+    const user = USERS.find((user) => user.email === email);
+    const hashed_password = hashSync(password, salt);
 
+    if (!user || user.hashed_password !== hashed_password) {
+        return res.status(400).json({ message: 'Invalid credentials.' });
+    }
 
-const token =client.createToken(user.id);
-return res.status(200).json({
-   token,
-   user:{
-    id: user.id,
-    email:user.email,
-   },
-});
-
+    const token = client.createToken(user.id);
+    return res.status(200).json({ token, user: { id: user.id, email: user.email } });
 });
 
 app.listen(PORT, () => {
